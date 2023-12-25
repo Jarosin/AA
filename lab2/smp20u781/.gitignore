@@ -1,0 +1,5 @@
+build
+
+*.drawio
+*.drawio.dtmp
+*.drawio.bkp

@@ -1,0 +1,269 @@
+\chapter{Технологическая часть}
+
+В данном разделе будут приведены требования к программному обеспечению, средства реализации, листинг кода и функциональные тесты.
+
+\section{Средства реализации}
+
+Для реализации данной лабораторной работы был выбран язык $C++$ ~\cite{cpp-lang}. Данный выбор был сделан, так как у языка есть встроенный модуль $ctime$ для измерения процессорного времени и тип данных, позволяющий хранить как кириллические символы, так и латинские --- $std::wstring$, что необходимо согласно третьему требованию из п.\ref{section:requirements} и соответствуют выдвинутым техническим требованиям.
+
+Время работы было замерено с помощью функции \textit{clock()} из библиотеки \textit{сtime}~\cite{cpp-lang-time}.
+
+\clearpage
+
+\section{Сведения о модулях программы}
+
+Данная программа разбита на следующие модули:
+
+\begin{itemize}
+	\item \texttt{main.cpp} --- файл, содержащий точку входа в программу, из которой происходит вызов алгоритмов по разработанному интерфейсу;
+	\item \texttt{levenshtein.cpp} --- файл содержит функции поиска расстояния Левенштейна и Дамерау-Левенштейна;
+	\item \texttt{memory.cpp} --- файл содержит функции динамического выделения и очищения памяти для матрицы;
+	\item \texttt{time.cpp} --- файл содержит функции, замеряющее процессорное время алгоритмов поиска расстояния Левенштейна и Дамерау-Левен-штейна;
+\end{itemize}
+
+\section{Реализация алгоритмов}
+
+В листингах \ref{lst:lev_mtr} -- \ref{lst:dameray_lev_rec_hash} приведены реализации алгоритмов поиска расстояния Левенштейна (только нерекурсивный алгоритм) и Дамерау-Левен-штейна (нерекурсивный, рекурсивный и рекурсивный с кэшированием).
+В листинге \ref{lst:allocate_mtr} приведены реализации алгоритмов выделения памяти под матрицу и очищения памяти из под нее.
+
+\clearpage
+
+\begin{lstlisting}[label=lst:lev_mtr,caption=Функция нахождения расстояния Левенштейна с использованием матрицы]
+int levenshtein_matrix(std::wstring &first_word, std::wstring &second_word)
+{
+	int first_length = first_word.length();
+	int second_length = second_word.length();
+	int **matrix = alloc_matrix(first_length + 1, second_length + 1);
+	for (int i = 0; i < first_length + 1; i++)
+	{
+		for (int j = 0; j < second_length + 1; j++)
+		{
+			if (i == 0 || j == 0)
+			{
+				matrix[i][j] = abs(i - j);
+			}
+			else
+			{
+				int equal = 1;
+				if (first_word[i - 1] == second_word[j - 1])
+					equal = 0;
+				matrix[i][j] = std::min({matrix[i - 1][j] + 1,
+											matrix[i][j - 1] + 1,
+											matrix[i - 1][j - 1] + equal});
+			}
+		}
+	}
+	int res = matrix[first_length][second_length];
+	free_matrix(matrix, first_length + 1);
+	return res;
+}
+\end{lstlisting}
+
+\clearpage
+
+\begin{lstlisting}[label=lst:dameray_lev_rec,caption=Функция нахождения расстояния Дамерау-Левенштейна с использованием матрицы]
+
+int damerau_levenshtein_matrix(std::wstring &first_word,
+	std::wstring &second_word)
+{
+	int first_length = first_word.length();
+	int second_length = second_word.length();
+	int **matrix = alloc_matrix(first_length + 1, second_length + 1);
+	for (int i = 0; i < first_length + 1; i++)
+	{
+		for (int j = 0; j < second_length + 1; j++)
+		{
+			if (i == 0 || j == 0)
+			{
+				matrix[i][j] = abs(i - j);
+			}
+			else
+			{
+				int equal = 1;
+				if (first_word[i - 1] == second_word[j - 1])
+				equal = 0;
+				matrix[i][j] = std::min({matrix[i - 1][j] + 1,
+							matrix[i][j - 1] + 1,
+							matrix[i - 1][j - 1] + equal});
+				if (i > 1 && j > 1 && first_word[i - 2] == second_word[j - 1] &&
+					first_word[i - 1] == second_word[j - 2])
+				{
+					matrix[i][j] = std::min(matrix[i][j],
+								matrix[i - 2][j - 2] + 1);
+				}
+			}
+		}
+	}
+	int res = matrix[first_length][second_length];
+	free_matrix(matrix, first_length + 1);
+	return res;
+}
+\end{lstlisting}
+
+\clearpage
+
+\begin{lstlisting}[label=lst:dameray_lev_mtr,caption=Функция нахождения расстояния Дамерау-Левенштейна рекурсивно]
+int damerau_lev_rec(std::wstring &first_word, std::wstring &second_word,
+	int n, int m)
+{
+	if (n == 0 || m == 0)
+		return abs(n - m);
+
+	int equal = 1;
+	if (first_word[n - 1] == second_word[m - 1])
+		equal = 0;
+
+	int res = std::min({damerau_lev_rec(first_word, second_word, n, m - 1) + 1,
+						damerau_lev_rec(first_word, second_word, n - 1, m) + 1,
+						damerau_lev_rec(first_word, second_word,
+						n - 1, m - 1) + equal});
+
+	if (n > 1 && m > 1 && first_word[n - 1] == second_word[m - 2] &&
+		first_word[n - 2] == second_word[m - 1])
+	{
+		res = std::min(res, damerau_lev_rec(first_word, second_word,
+											n - 2, m - 2) + 1);
+	}
+
+	return res;
+}
+
+int damerau_lev_recursion(std::wstring &first_word, std::wstring &second_word)
+{
+    return damerau_lev_rec(first_word, second_word,
+                           first_word.length(), second_word.length());
+}
+\end{lstlisting}
+
+\clearpage
+
+\begin{lstlisting}[label=lst:dameray_lev_rec_hash,caption=Функция нахождения расстояния Дамерау-Левенштейна рекурсивно c кешированием]
+
+int damerau_lev_rec_hash(std::wstring &first_word, std::wstring &second_word,
+                    int **matrix, int n, int m)
+{
+    if (matrix[n][m] != -1) {
+        return matrix[n][m];
+    }
+
+    if (n == 0 || m == 0) {
+        matrix[n][m] = std::max(m, n);
+        return matrix[n][m];
+    }
+
+    int equal = 1;
+    if (first_word[n - 1] == second_word[m - 1])
+        equal = 0;
+
+    matrix[n][m] = std::min({damerau_lev_rec_hash(first_word, second_word, matrix, n, m - 1) + 1,
+                       damerau_lev_rec_hash(first_word, second_word, matrix, n - 1, m) + 1,
+                       damerau_lev_rec_hash(first_word, second_word, matrix,
+                                       n - 1, m - 1) + equal});
+
+    if (n > 1 && m > 1 && first_word[n - 1] == second_word[m - 2] &&
+        first_word[n - 2] == second_word[m - 1])
+    {
+        matrix[n][m] = std::min(matrix[n][m], damerau_lev_rec_hash(first_word, second_word, matrix,
+                                            n - 2, m - 2) + 1);
+    }
+
+    return matrix[n][m];
+}
+
+int damerau_lev_recursion_hash(std::wstring &first_word, std::wstring &second_word)
+{
+    int first_length = first_word.length();
+    int second_length = second_word.length();
+
+    int **matrix = alloc_matrix(first_length + 1, second_length + 1);
+    for (int i = 0; i < first_length + 1; i++) {
+        for (int j = 0; j < second_length + 1; j++) {
+            matrix[i][j] = -1;
+        }
+    }
+
+    int res = damerau_lev_rec_hash(first_word, second_word, matrix,
+                           first_word.length(), second_word.length());
+
+    free_matrix(matrix, first_length + 1);
+    return res;
+}
+
+\end{lstlisting}
+
+\clearpage
+
+\begin{lstlisting}[label=lst:allocate_mtr,caption=Функции динамического выделения и очищения памяти под матрицу]
+int **alloc_matrix(int n, int m) {
+    if (n < 1 || m < 1) {
+        return nullptr;
+    }
+    int **matrix = new int*[n];
+    for (int i = 0; i < n; i++) {
+        matrix[i] = new int[m];
+    }
+    return matrix;
+}
+
+int free_matrix(int **matrix, int n) {
+    if (n < 1 || matrix == nullptr) {
+        return 1;
+    }
+    for (int i = 0; i < n; i++) {
+        delete[] matrix[i];
+    }
+    delete[] matrix;
+    return 0;
+}
+\end{lstlisting}
+
+\clearpage
+
+\section{Функциональные тесты}
+
+В таблице \ref{tbl:func_tests} приведены функциональные тесты для алгоритмов вычисления расстояний Левенштейна и Дамерау—Левенштейна.
+Все тесты пройдены успешно.
+
+\begin{table}[ht]
+	\small
+	\begin{center}
+		\begin{threeparttable}
+		\caption{Функциональные тесты}
+		\label{tbl:func_tests}
+		\begin{tabular}{|c|c|r|r|r|r|}
+			\hline
+			\multicolumn{2}{|c|}{\bfseries Входные данные}
+			& \multicolumn{4}{c|}{\bfseries Расстояние и алгоритм} \\
+			\hline
+			&
+			& \multicolumn{1}{c|}{\bfseries Левенштейна}
+			& \multicolumn{3}{c|}{\bfseries Дамерау-Левенштейна} \\ \cline{3-6}
+
+			\bfseries Строка 1 & \bfseries Строка 2 & \bfseries Итеративный & \bfseries Итеративный
+
+			& \multicolumn{2}{c|}{\bfseries Рекурсивный} \\ \cline{5-6}
+			& & & & \bfseries Без кеша & \bfseries С кешом \\
+			\hline
+			a & b & 1 & 1 & 1 & 1 \\
+			\hline
+			a & a & 0 & 0 & 0 & 0 \\
+			\hline
+			12 & 123 & 1 & 1 & 1 & 1 \\
+			\hline
+			123 & 12 & 1 & 1 & 1 & 1 \\
+			\hline
+			hello & helol & 2 & 1 & 1 & 1 \\
+			\hline
+			привет & привте & 2 & 1 & 1 & 1 \\
+			\hline
+			слон & слоны & 1 & 1 & 1 & 1 \\
+			\hline
+		\end{tabular}
+		\end{threeparttable}
+	\end{center}
+\end{table}
+
+\section*{Вывод}
+
+Были реализованы алгоритмы поиска расстояния Левенштейна итеративно, а также поиска расстояния Дамерау–Левенштейна итеративно, рекурсивно и рекурсивного с кеширования.
+Проведено тестирование реализаций алгоритмов.

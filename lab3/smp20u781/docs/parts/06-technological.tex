@@ -1,0 +1,184 @@
+\chapter{Технологическая часть}
+
+В данном разделе приведены средства реализации программного обеспечения, листинги кода и функциональные тесты.
+
+\section{Средства реализации}
+
+В качестве языка программирования для реализации данной лабораторной работы был выбран язык $C++$~\cite{cpp-lang}.
+Данный выбор обусловлен наличием у языка встроенной библиотеки измерения процессорного времени и соответствием с выдвинутыми требованиям.
+
+Для измерения времени использовалась функция \textit{clock()} из библиотеки \textit{ctime}~\cite{cpp-lang-time}.
+
+\clearpage
+
+\section{Сведения о файлах программы}
+
+Данная программа разбита на следующие файлы:
+
+\begin{itemize}[label=---]
+	\item \texttt{main.cpp} --- файл, содержащий точку входа в программу, в нем происходи общение с пользователем и вызов алгоритмов;
+	\item \texttt{src/algs.cpp} --- файл содержит алгоритмы сортировка;
+	\item \texttt{src/io.cpp} --- файл содержит функции для ввода и вывода массива;
+	\item \texttt{src/cpu\_time.cpp} --- файл содержит функции, замеряющее процессорное время методов сортировки.
+\end{itemize}
+
+В листингах \ref{lst:insert} -- \ref{lst:bitonic} реализованы алгоритмы сортировки, а именно сортировка вставками, пирамидальная сортировка и битонная сортировка.
+
+\clearpage
+
+\begin{lstlisting}[label=lst:insert,caption=Функция сортировки вставками]
+int insert_sort(int *array, int len)
+{
+	for (int i = 1; i < len; i++)
+	{
+		for (int j = i; j > 0 && array[j - 1] > array[j]; j--)
+		{
+			int tmp = array[j - 1];
+			array[j - 1] = array[j];
+			array[j] = tmp;
+		}
+	}
+	return 0;
+}
+\end{lstlisting}
+
+\clearpage
+
+\begin{lstlisting}[label=lst:heap,caption=Функция пирамидальной сортировки]
+void heapify(int *array, int i, int n)
+{
+	int largest;
+	int done = 0;
+	int l, r;
+
+	while((2 * i <= n) && !done)
+	{
+		l = 2 * i;
+		r = 2 * i + 1;
+
+		if (l == n)
+		{
+			largest = l;
+		} else if (array[l] > array[r])
+			largest = l;
+		else
+			largest = r;
+
+		if (array[i] < array[largest])
+		{
+			int temp = array[i];
+			array[i] = array[largest];
+			array[largest] = temp;
+			i = largest;
+		}
+		else
+			done = 1;
+	}
+}
+
+void heap_sort(int *array, int n)
+{
+	if (array != nullptr && n > 0)
+	{
+		for (int i = n / 2; i >= 0; i--)
+		{
+			heapify(array, i, n - 1);
+		}
+
+		for (int i = n - 1; i >= 1; i--)
+		{
+			int temp = array[0];
+			array[0] = array[i];
+			array[i] = temp;
+			heapify(array, 0, i - 1);
+		}
+	}
+}
+\end{lstlisting}
+
+\clearpage
+
+\begin{lstlisting}[label=lst:bitonic,caption=Функция битонной сортировки]
+void compAndSwap(int *array, int first_index, int second_index, int dir)
+{
+	int temp;
+	if (dir == (array[first_index] > array[second_index]))
+	{
+		temp = array[first_index];
+		array[first_index] = array[second_index];
+		array[second_index] = temp;
+	}
+}
+
+void bitonicMerge(int *array, int start, int len, int dir)
+{
+	if (len > 1)
+	{
+		int half_len = len / 2;
+		for (int i = start; i < start + half_len; i++)
+			compAndSwap(array, i, i + half_len, dir);
+		bitonicMerge(array, start, half_len, dir);
+		bitonicMerge(array, start + half_len, half_len, dir);
+	}
+}
+
+void bitonicSort(int *array, int start, int len, int dir)
+{
+	if (len > 1)
+	{
+		int half_len = len / 2;
+
+		bitonicSort(array, start, half_len, 1);
+
+		bitonicSort(array, start + half_len, half_len, 0);
+
+		bitonicMerge(array, start, len, dir);
+	}
+}
+
+void bitonic_sort(int *array, int length, int up)
+{
+	bitonicSort(array, 0, length, up);
+}
+\end{lstlisting}
+
+\clearpage
+\section{Функциональные тесты}
+
+В таблице \ref{tbl:func_tests} приведены функциональные тесты для разработанных алгоритмов сортировки.
+Все тесты пройдены успешно.
+Под обозначением «$-$»\space в строках таблицы значит, что данный алгоритм сортировки не может работать с числом элементов, не являющимся степенью двойки, что истинно для битонной сортировки.
+
+\begin{table}[ht]
+	\small
+	\begin{center}
+		\begin{threeparttable}
+		\caption{Функциональные тесты}
+		\label{tbl:func_tests}
+		\begin{tabular}{|c|c|c|c|c|}
+			\hline
+			\bfseries Массив
+			& \bfseries Размер
+			& \bfseries Ожидаемый р-т
+			& \multicolumn{2}{c|}{\bfseries Фактический результат} \\ \cline{4-5}
+			& & & \bfseries Вст./Пирам. & \bfseries Бит. \\
+			\hline
+			41 67 34 0 & 4 & 0 34 41 67 & 0 34 41 67 & 0 34 41 67 \\
+			\hline
+			31 57 24 -10 & 4 & -10 24 31 57 & -10 24 31 57 & -10 24 31 57 \\
+			\hline
+			1 2 3 4 & 4 & 1 2 3 4 & 1 2 3 4 & 1 2 3 4 \\
+			\hline
+			100 88 76 65 & 4 & 65 76 88 100 & 65 76 88 100 & 65 76 88 100 \\
+			\hline
+			-59 -33 -66 -100 -31 & 5 & -100 -66 -59 -33 -31 & -100 -66 -59 -33 -31 & - \\
+			\hline
+		\end{tabular}
+		\end{threeparttable}
+	\end{center}
+\end{table}
+
+\section*{Вывод}
+
+Были реализованы алгоритмы: сортировка вставками, пирамидальная сортировка и битонная сортировка.
+Проведено тестирование разработанных алгоритмов.

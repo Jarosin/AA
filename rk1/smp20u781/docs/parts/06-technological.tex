@@ -1,0 +1,216 @@
+\chapter{Технологическая часть}
+
+В данном разделе приведены средства реализации программного обеспечения и листинги кода реализаций алгоритма.
+
+\section{Средства реализации}
+
+В качестве языка программирования для реализации данной лабораторной работы был выбран язык $C++$~\cite{cpp-lang}.
+Данный выбор обусловлен наличием у языка встроенной библиотеки измерения процессорного времени и соответствием с выдвинутыми требованиям.
+
+Для измерения времени использовалась функция \textit{clock()} из библиотеки \textit{ctime}~\cite{cpp-lang-time}.
+
+\clearpage
+
+\section{Сведения о файлах программы}
+
+Данная программа разбита на следующие файлы:
+
+\begin{itemize}[label=---]
+	\item \texttt{main.cpp} --- файл, содержащий точку входа в программу, в нем происходи общение с пользователем и вызов алгоритмов;
+	\item \texttt{src/threads.cpp} --- файл содержит функции, реализующие алгоритм поиска подстроки в файле;
+	\item \texttt{src/file.cpp} --- файл содержит функции для работы с файлами;
+	\item \texttt{src/cpu\_time.cpp} --- файл содержит функции, замеряющие время работы написанных функций.
+\end{itemize}
+
+В листингах \ref{lst:main_thread} -- \ref{lst:lev} приведены реализации алгоритма поиска подстроки в файле.
+
+\clearpage
+
+\begin{lstlisting}[label=lst:main_thread,caption=Функция работы основного потока при многопоточной реализации]
+int thread_substring_replace(std::string &in_file, std::string &out_file, std::string &substr, size_t thread_total)
+{
+	reader_done = false;
+	parsers_done = false;
+	std::ifstream in(in_file, std::ios::in);
+	if (!in.is_open())
+	{
+		return 1;
+	}
+	std::ofstream out(out_file);
+	if (!out.is_open())
+	{
+		return 1;
+	}
+	std::string line;
+	ThreadQueue<std::string> out_queue;
+	ThreadQueue<std::pair<std::string, int>> in_queue;
+	std::vector<std::thread> threads;
+	std::thread thread_read(read_thread, std::ref(in), std::ref(in_queue));
+	threads.push_back(std::move(thread_read));
+	for (int i = 0; i < thread_total; i++)
+	{
+		std::thread thread_obj(thread_substr, std::ref(substr), std::ref(out_queue), std::ref(in_queue));
+		threads.push_back(std::move(thread_obj));
+	}
+	std::thread thread_write(write_thread, std::ref(out), std::ref(out_queue));
+	for (int i = 0; i < threads.size(); i++)
+	{
+		threads[i].join();
+	}
+	{
+		std::lock_guard<std::mutex> _(parsers_done_mutex);
+		parsers_done = true;
+	}
+	thread_write.join();
+	in.close();
+	out.close();
+	return 0;
+}
+\end{lstlisting}
+
+\clearpage
+
+\begin{lstlisting}[label=lst:read,caption=Функция работы потока-читателя]
+void read_thread(std::ifstream &in, ThreadQueue<std::pair<std::string, int>> &out_queue)
+{
+	if (!in.is_open())
+	{
+		return;
+	}
+
+	std::string line;
+	int cur = 0;
+	while (getline(in, line))
+	{
+		out_queue.push(std::pair<std::string, int>(line, cur));
+		cur++;
+	}
+	std::unique_lock<std::shared_mutex> r(reader_done_mutex);
+	reader_done = true;
+	return;
+}
+\end{lstlisting}
+
+\clearpage
+
+\begin{lstlisting}[label=lst:write,caption=Функция работы потока-писателя]
+void write_thread(std::ofstream &out, ThreadQueue<std::string> &in_queue)
+{
+	if (!out.is_open())
+	{
+		return;
+	}
+
+	std::string line;
+	while (true)
+	{
+		if (in_queue.empty())
+		{
+			std::lock_guard<std::mutex> _(parsers_done_mutex);
+			if (parsers_done)
+				return;
+			continue;
+		}
+		line = in_queue.pop();
+		out << line;
+
+	}
+	return;
+}
+\end{lstlisting}
+
+\clearpage
+
+\begin{lstlisting}[label=lst:parse,caption=Функция работы потока, обрабатывающего строки]
+void thread_substr(std::string &substr, ThreadQueue<std::string> &out_queue, ThreadQueue<std::pair<std::string, int>> &in_queue)
+{
+	std::pair<std::string, int> top;
+	int max_typo_total = calculate_k(substr.length());
+
+	while (true)
+	{
+		try
+		{
+			top = in_queue.pop();
+		}
+		catch (...)
+		{
+			std::shared_lock<std::shared_mutex> r(reader_done_mutex);
+			if (reader_done)
+			{
+				return;
+			}
+			continue;
+		}
+
+		for (int i = 0; i < top.first.length(); i++)
+		{
+			if (is_substr_prefix(top.first, substr, max_typo_total, i))
+			{
+				std::ostringstream stream;
+				stream << top.second + 1 << " " << i << "\n";
+				out_queue.push(stream.str());
+			}
+		}
+	}
+}
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:substr,caption=Функция поиска подстроки]
+bool is_substr_prefix(std::string &src, std::string &substr, int max_typo_count, size_t pos)
+{
+	std::string src_substr = src.substr(pos, std::min(src.length() - pos, substr.length()));
+	int typo_count = damerau_levenshtein_matrix(src_substr, substr);
+	if (typo_count > max_typo_count)
+	{
+		return false;
+	}
+
+	return true;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:lev,caption=Функция поиска расстояния Дамерау-Левенштейна]
+int damerau_levenshtein_matrix(std::string &first_word,
+                               std::string &second_word)
+{
+    int first_length = first_word.length();
+    int second_length = second_word.length();
+
+    int **matrix = alloc_matrix(first_length + 1, second_length + 1);
+
+    for (int i = 0; i < first_length + 1; i++)
+    {
+        for (int j = 0; j < second_length + 1; j++)
+        {
+            if (i == 0 || j == 0)
+            {
+                matrix[i][j] = abs(i - j);
+            }
+            else
+            {
+                int equal = 1;
+                if (first_word[i - 1] == second_word[j - 1])
+                    equal = 0;
+                matrix[i][j] = std::min({matrix[i - 1][j] + 1,
+                                         matrix[i][j - 1] + 1,
+                                         matrix[i - 1][j - 1] + equal});
+                if (i > 1 && j > 1 && first_word[i - 2] == second_word[j - 1] &&
+                    first_word[i - 1] == second_word[j - 2])
+                {
+                    matrix[i][j] = std::min(matrix[i][j],
+                                            matrix[i - 2][j - 2] + 1);
+                }
+            }
+        }
+    }
+    int res = matrix[first_length][second_length];
+    free_matrix(matrix, first_length + 1);
+
+    return res;
+}
+\end{lstlisting}
+
+\section*{Вывод}
+
+В данном разделе были рассмотрены средства реализации, а также представлен листинг реализации алгоритма поиска подстроки в файле с учетом опечаток.

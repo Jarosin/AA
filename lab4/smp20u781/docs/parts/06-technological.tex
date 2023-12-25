@@ -1,0 +1,183 @@
+\chapter{Технологическая часть}
+
+В данном разделе приведены средства реализации программного обеспечения и листинги кода реализаций алгоритма.
+
+\section{Средства реализации}
+
+В качестве языка программирования для реализации данной лабораторной работы был выбран язык $C++$~\cite{cpp-lang}.
+Данный выбор обусловлен наличием у языка встроенной библиотеки измерения количества тиков процессора, прошедших с момента запуска, и соответствием с выдвинутыми требованиям.
+
+Для измерения времени использовалась функция \textit{clock()} из библиотеки \textit{ctime}~\cite{cpp-lang-time}.
+
+\clearpage
+
+\section{Сведения о файлах программы}
+
+Данная программа разбита на следующие файлы:
+
+\begin{itemize}[label=---]
+	\item \texttt{main.cpp} --- файл, содержащий точку входа в программу, в нем происходит взаимодействие с пользователем и вызов алгоритмов;
+	\item \texttt{src/threads.cpp} --- файл содержит функции, реализующие алгоритм поиска подстроки в файле;
+	\item \texttt{src/file.cpp} --- файл содержит функции для работы с файлами;
+	\item \texttt{src/cpu\_time.cpp} --- файл содержит функции, замеряющие время работы написанных функций.
+\end{itemize}
+
+В листингах \ref{lst:single} -- \ref{lst:parse} приведены реализации алгоритма поиска подстроки в файле.
+
+\clearpage
+
+\begin{lstlisting}[label=lst:single,caption=Функция поиска подстроки в файле с одним потоком.]
+int seq_substring_replace(std::string &in_file, std::string &out_file, std::string &substr)
+{
+	std::ifstream in(in_file, std::ios::in);
+	if (!in.is_open())
+	{
+		return 1;
+	}
+	std::ofstream out(out_file);
+	if (!out.is_open())
+	{
+		return 1;
+	}
+
+	int total = find_file_line_total(in);
+	if (substr_search_pos(in, out, substr, 0, total))
+	{
+		in.close();
+		out.close();
+		return 1;
+	}
+
+	in.close();
+	out.close();
+	return 0;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:main_thread,caption=Функция работы основного потока при многопоточной реализации]
+int thread_substring_replace(std::string &in_file, std::string &out_file, std::string &substr, size_t thread_total)
+{
+	reader_done = false;
+	parsers_done = false;
+	std::ifstream in(in_file, std::ios::in);
+	if (!in.is_open())
+	{
+		return 1;
+	}
+	std::ofstream out(out_file);
+	if (!out.is_open())
+	{
+		return 1;
+	}
+	std::string line;
+	ThreadQueue<std::string> out_queue;
+	ThreadQueue<std::pair<std::string, int>> in_queue;
+	std::vector<std::thread> threads;
+	std::thread thread_read(read_thread, std::ref(in), std::ref(in_queue));
+	threads.push_back(std::move(thread_read));
+	for (int i = 0; i < thread_total; i++)
+	{
+		std::thread thread_obj(thread_substr, std::ref(substr), std::ref(out_queue), std::ref(in_queue));
+		threads.push_back(std::move(thread_obj));
+	}
+	std::thread thread_write(write_thread, std::ref(out), std::ref(out_queue));
+	for (int i = 0; i < threads.size(); i++)
+	{
+		threads[i].join();
+	}
+	{
+		std::lock_guard<std::mutex> _(parsers_done_mutex);
+		parsers_done = true;
+	}
+	thread_write.join();
+	in.close();
+	out.close();
+	return 0;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:read,caption=Функция работы потока-читателя]
+void read_thread(std::ifstream &in, ThreadQueue<std::pair<std::string, int>> &out_queue)
+{
+	if (!in.is_open())
+	{
+		return;
+	}
+
+	std::string line;
+	int cur = 0;
+	while (getline(in, line))
+	{
+		out_queue.push(std::pair<std::string, int>(line, cur));
+		cur++;
+	}
+	std::unique_lock<std::shared_mutex> r(reader_done_mutex);
+	reader_done = true;
+	return;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:write,caption=Функция работы потока-писателя]
+void write_thread(std::ofstream &out, ThreadQueue<std::string> &in_queue)
+{
+	if (!out.is_open())
+	{
+		return;
+	}
+
+	std::string line;
+	while (true)
+	{
+		if (in_queue.empty())
+		{
+			std::lock_guard<std::mutex> _(parsers_done_mutex);
+			if (parsers_done)
+				return;
+			continue;
+		}
+		line = in_queue.pop();
+		out << line;
+
+	}
+	return;
+}
+\end{lstlisting}
+
+\begin{lstlisting}[label=lst:parse,caption=Функция работы потока, обрабатывающего строки]
+void thread_substr(std::string &substr, ThreadQueue<std::string> &out_queue, ThreadQueue<std::pair<std::string, int>> &in_queue)
+{
+	size_t pos;
+	std::pair<std::string, int> top;
+
+	while (true)
+	{
+		try
+		{
+			top = in_queue.pop();
+		}
+		catch (...)
+		{
+			std::shared_lock<std::shared_mutex> r(reader_done_mutex);
+			if (reader_done)
+			{
+				return;
+			}
+			continue;
+		}
+
+		pos = top.first.find(substr);
+		while (pos != std::string::npos)
+		{
+			std::ostringstream stream;
+			stream << top.second + 1 << " " << pos << "\n";
+			out_queue.push(stream.str());
+
+			pos = top.first.find(substr, pos + 1);
+		}
+	}
+}
+\end{lstlisting}
+
+\section*{Вывод}
+
+В данном разделе были рассмотрены средства реализации, а также представлен листинг реализации алгоритма поиска подстроки в файле.

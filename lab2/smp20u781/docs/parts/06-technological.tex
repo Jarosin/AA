@@ -1,0 +1,256 @@
+\chapter{Технологическая часть}
+
+В данном разделе будут приведены средства реализации, листинги кода и функциональные тесты.
+
+\section{Средства реализации}
+
+Для написания реализации данной лабораторной работы был выбран язык программирования C++~\cite{cpp-lang}.
+Данный выбор обусловлен наличием у языка встроенной библиотеки измерения процессорного времени и соответствием с выдвинутыми техническими требованиям.
+
+Для измерения времени использовалось функция \textit{clock()} из модуля \textit{ctime}~\cite{cpp-lang-time}.
+
+\clearpage
+
+\section{Сведения о файлах программы}
+
+Данная программа разбита на следующие файлы:
+
+\begin{itemize}[label=---]
+	\item \texttt{main.cpp} --- файл, содержащий точку входа в программу. В не происходит общение с пользователем и вызов алгоритмов;
+	\item \texttt{matrix.cpp} --- файл содержит алгоритмы умножения матриц, вывод матриц;
+	\item \texttt{io.cpp} --- файл содержит функции чтение матрицы;
+	\item \texttt{cpu\_time.cpp} --- файл содержит функции, замеряющее процессорное время, затрачиваемое реализациями алгоритмов умножения матриц.
+\end{itemize}
+
+\section{Реализация алгоритмов}
+
+В листингах \ref{lst:standart} -- \ref{lst:vinograd_opt} реализованы алгоритмы умножения матриц --- классический, алгоритм Винограда и оптимизированный алгоритм Винограда.
+
+\lstinputlisting[label=lst:standart,caption={Функция, реализующая классический алгоритм умножения матриц}, firstline=89,lastline=105]{../src/matrix.cpp}
+
+\lstinputlisting[label=lst:vinograd,caption={Функция, реализующая умножение матриц по алгоритму Винограда}, firstline=25,lastline=53]{../src/matrix.cpp}
+\clearpage
+
+\lstinputlisting[label=lst:vinograd_opt,caption={Функция, реализующая умножение матриц по оптимизированному алгоритму Винограда}, firstline=55,lastline=87]{../src/matrix.cpp}
+\clearpage
+
+\section{Функциональные тесты}
+
+В таблице \ref{tbl:func_tests_std} и \ref{tbl:func_tests_vin} приведены функциональные тесты для разработанных реализаций алгоритмов умножения матриц. Все тесты пройдены успешно.
+
+\begin{table}[ht]
+	\small
+	\begin{center}
+		\begin{threeparttable}
+		\caption{Функциональные тесты для классического алгоритма умножения матриц}
+		\label{tbl:func_tests_std}
+		\begin{tabular}{|c|c|c|c|c|}
+			\hline
+			\multicolumn{2}{|c|}{\bfseries Входные данные}
+			& \multicolumn{2}{c|}{\bfseries Результат для классического алгоритма} \\
+			\hline
+			\bfseries Матрица 1
+			& \bfseries Матрица 2
+			& \bfseries Ожидаемый результат
+			& \bfseries Фактический результат \\
+			\hline
+			$\begin{pmatrix}
+				1 & 5 & 7\\
+				2 & 6 & 8\\
+				3 & 7 & 9
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				&
+			\end{pmatrix}$
+			&
+			\text{Сообщение об ошибке}
+			&
+			\text{Сообщение об ошибке} \\
+			\hline
+			$\begin{pmatrix}
+				1 & 5 & 7\\
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				1 & 2 & 3\\
+			\end{pmatrix}$
+			&
+			\text{Сообщение об ошибке}
+			&
+			\text{Сообщение об ошибке} \\
+			\hline
+			$\begin{pmatrix}
+				1 & 2 & 3\\
+				4 & 5 & 6 \\
+				7 & 8 & 9 \\
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				1 & 0 & 0\\
+				0 & 1 & 0 \\
+				0 & 0 & 1 \\
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				1 & 0 & 0\\
+				0 & 1 & 0 \\
+				0 & 0 & 1 \\
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				1 & 2 & 3\\
+				4 & 5 & 6 \\
+				7 & 8 & 9 \\
+			\end{pmatrix}$ \\
+			\hline
+			$\begin{pmatrix}
+				3 & 5\\
+				2 & 1\\
+				9 & 7\\
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				1 & 2 & 3\\
+				4 & 5 & 6 \\
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				23 & 31 & 39 \\
+				6 & 9 & 12
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				23 & 31 & 39 \\
+				6 & 9 & 12
+			\end{pmatrix}$ \\
+			\hline
+			$\begin{pmatrix}
+				10
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				35
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				350
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				350
+			\end{pmatrix}$ \\
+			\hline
+		\end{tabular}
+		\end{threeparttable}
+	\end{center}
+\end{table}
+
+\begin{table}[ht]
+	\small
+	\begin{center}
+		\begin{threeparttable}
+		\caption{Функциональные тесты для умножения матриц по алгоритму Винограда}
+		\label{tbl:func_tests_vin}
+		\begin{tabular}{|c|c|c|c|c|}
+			\hline
+			\multicolumn{2}{|c|}{\bfseries Входные данные}
+			& \multicolumn{2}{c|}{\bfseries Результат для алгоритма Винограда} \\
+			\hline
+			\bfseries Матрица 1
+			& \bfseries Матрица 2
+			& \bfseries Ожидаемый результат
+			& \bfseries Фактический результат \\
+			\hline
+			$\begin{pmatrix}
+				1 & 5 & 7\\
+				2 & 6 & 8\\
+				3 & 7 & 9
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				&
+			\end{pmatrix}$
+			&
+			\text{Сообщение об ошибке}
+			&
+			\text{Сообщение об ошибке} \\
+			\hline
+			$\begin{pmatrix}
+				1 & 5 & 7\\
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				1 & 2 & 3\\
+			\end{pmatrix}$
+			&
+			\text{Сообщение об ошибке}
+			&
+			\text{Сообщение об ошибке} \\
+			\hline
+			$\begin{pmatrix}
+				1 & 2 & 3\\
+				4 & 5 & 6 \\
+				7 & 8 & 9 \\
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				1 & 0 & 0\\
+				0 & 1 & 0 \\
+				0 & 0 & 1 \\
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				1 & 0 & 0\\
+				0 & 1 & 0 \\
+				0 & 0 & 1 \\
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				1 & 2 & 3\\
+				4 & 5 & 6 \\
+				7 & 8 & 9 \\
+			\end{pmatrix}$ \\
+			\hline
+			$\begin{pmatrix}
+				3 & 5\\
+				2 & 1\\
+				9 & 7\\
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				1 & 2 & 3\\
+				4 & 5 & 6 \\
+			\end{pmatrix}$
+			&
+			\text{Сообщение об ошибке}
+			&
+			\text{Сообщение об ошибке} \\
+			\hline
+			$\begin{pmatrix}
+				10
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				35
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				350
+			\end{pmatrix}$
+			&
+			$\begin{pmatrix}
+				350
+			\end{pmatrix}$ \\
+			\hline
+		\end{tabular}
+		\end{threeparttable}
+	\end{center}
+\end{table}
+
+\clearpage
+
+\section*{Вывод}
+
+Были представлены листинги реализаций всех алгоритмов умножения матриц --- стандартного, Винограда и оптимизированного Винограда.
+Также в данном разделе была приведена информация о выбранных средствах для разработки реализаций алгоритмов.
